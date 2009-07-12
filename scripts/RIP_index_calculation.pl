@@ -114,16 +114,16 @@ use constant DOUBLET_LENGTH => 2;
 # variables to be set by cmdline options
 my ($index_type) = qw(CRI);  # one of 'product','substrate', 'CRI' or 'composite'
 
-my ($window,$step) = (500,100);
+my ($window,$step) = (500,10);
 my $minlen         = $step;
 my $sformat = 'fasta';  # sequence format
 my $rformat = 'RIPgff'; # RIP report format
-my %cutoffs = (composite => sub { (shift @_) > 0.5 },
+my %cutoffs = (composite => sub { (shift @_) >1 },
 	       product   => sub { (shift @_) > 1.1},
 	       substrate => sub { (shift @_) < 0.9 } );
 #GFF fields
-my $src_type = 'RIP_index';
-my $src_name = 'region';
+my $src;
+my $type = 'region';
 
 my (@input,$output);
 
@@ -141,6 +141,7 @@ GetOptions(
 	   'f|format:s'    => \$sformat,
 	   'i|input=s'     => \@input,
 	   'o|output:s'    => \$output,
+	   'sourcetag:s'   => \$src,
 
 	   'r|report:s'    => \$rformat,
 	   
@@ -160,6 +161,8 @@ if( $index_type =~ /prod/i ) {
     $index_type = 'composite';
 }
 
+$src ||= "RIP_".$index_type."_index";
+
 unless( @input ) {
     unless( @ARGV ) {
 	die("Require an input file via -i or --input or on the cmdline. See usage with -h\n");
@@ -168,7 +171,6 @@ unless( @input ) {
 	@input = @ARGV;
     }
 }
-
 
 if( $rformat !~ /wig|bed|RIPbed|RIPgff/ ) {
     die("rformat of $rformat is unrecognized. See usage with -h\n");
@@ -181,6 +183,9 @@ if( defined $output ) {
     $outfh = \*STDOUT;
 }
 
+if($rformat eq 'RIPgff' ) {
+    print $outfh "##gff-version 3\n";
+}
 my @doublets;
 { # some initialization code 
     for my $base1 ( qw(C A G T) ) {
@@ -207,7 +212,7 @@ for my $file ( @input ) {
     if( $rformat eq 'wig' ) {
 	printf $outfh "type track=%s name=\"%s\" description=\"%s %s %d bp windows\"\n",
 	'wiggle_0', "$index_type RIP index",
-	"\U$index_type",
+	"$index_type",
 	'RIP index calculation',
 	$window;
     }
@@ -217,8 +222,8 @@ for my $file ( @input ) {
     # not sure if it would be faster?
     my $in = Bio::SeqIO->new(-format => $sformat, 
 			     -fh     => $fh);
-    my @rip_features;
     while( my $seq = $in->next_seq ) {	
+	my @rip_features;
 	my $seqid = $seq->display_id;
 	warn("processing $seqid sequence\n") if $debug;
 	if( $rformat eq 'wig' ) {
@@ -266,7 +271,7 @@ for my $file ( @input ) {
 					  ($freq{CA} + $freq{TG}) /
 					  ($freq{AC} + $freq{GT} ) : -1),
 			  );
-	    $index{composite} = $index{substrate} - $index{product};
+	    $index{composite} = $index{product} - $index{substrate};
 	    
 	    if( $rformat eq 'bed' ) {
 		print $outfh join("\t",
@@ -281,12 +286,13 @@ for my $file ( @input ) {
 		printf $outfh "%.4f\n",$index{$index_type};
 	    } 
 	    if( $cutoffs{$index_type}->($index{$index_type}) ) {
-		warn("RIP region ($index_type) has score of $index{$index_type} $i..\n") if $debug;
-		push @rip_features, [$i+1,$i+$window,$index{$index_type}];
+		warn("RIP region ($index_type) has score of $index{$index_type} ($i).\n") if $debug;
+		push @rip_features, [$i+1,$i+$window,
+				     $index{$index_type}];
 	    }
 	    $i+= $step;
 	}
-	
+		
 	$i = 0;
 	for my $f ( &collapse_rip_features(\@rip_features,$step) ) {
 	    $f->[2] = sprintf("%.4f",$f->[2]); # signif digits
@@ -302,74 +308,90 @@ for my $file ( @input ) {
 				  '.',
 				  ),"\n";
 	    } elsif ($rformat eq 'RIPgff' ) {
+		my $ripid = sprintf("%s_RIP%05d",$seqid,$i++);
 		print $outfh join("\t", $seqid,
-				  $src_name,
-				  $src_type,
+				  $src,
+				  $type,
 				  @$f,
 				  '.',
 				  '.',
-				  sprintf("ID=%s_RIP%05d",
-					  $seqid,
-					  $i++),
+				  sprintf("ID=%s;Name=%s",
+					  $ripid,
+					  $ripid),
 				  ), "\n";
 	    }
-	}
+	}	
 	last if $debug;
     }
-
     close($fh);
     $fh = undef;
+}
+
+sub range_compare {
+    # returns -1 if left < right
+    # returns 0 if they overlap
+    # returns 1 if left > right
+    my ($left,$right) = @_;
+    my @left = @$left;
+    my @right = @$right;
+#    $left[0] -= 1;
+#    $left[1] += 1;
+    
+#    $right[0] -= 1;
+#    $right[1] += 1;
+    warn("comparing @$left to @$right\n") if $debug;
+    # start of the left occurs AFTER the end of the right, can't overlap
+    if( $left[0] > $right[1] ) {
+	warn("returning 1 (left is after right)\n") if $debug; 
+	return 1;
+	# end of the left finishes BEFORE the start of the right, can't overlap
+    } elsif( $left[1] < $right[0] ) {
+	warn("returning -1 (left is before right)\n") if $debug; 
+	return -1
+    } else { 
+	warn("left overlaps right\n") if $debug;
+	return 0;
+    }
+}
+
+sub merge { 
+    my ($left,$right) = @_;
+    $left->[0] = min($left->[0], $right->[0]);
+    $left->[1] = max($left->[1], $right->[1]);
+    push @{$left->[2]}, @{$right->[2]};
 }
 
 sub collapse_rip_features {
     my ($feats,$step_size) = @_;
     my $last;
-    my (@tmplst,@newlst);
-    my $run = 0;
-    my $index= 0;
-    for my $f (map { [ (($_->[0] - 1) / $step_size),@$_]} @$feats ) {
-	# f is now
-	# f[0] -> bin (transformation of start)
-	# f[1] -> start
-	# f[2] -> end
-	# f[3] -> score
-	warn("f[0] is ", $f->[0], " for ", $f->[1], "\n") if $debug;
-	if( defined $last && $last->[0]+1 == $f->[0] ) {
-	    push @{$tmplst[$index]}, $last;
-	    $run++;
-	} elsif( defined $last ) {
-	    if( $run ) { 
-		push @{$tmplst[$index]}, $last;		
-	    } else {
-		push @tmplst, [$last];
+    #               start    stop      score
+    my @f = ( map { [ $_->[0], $_->[1], [ $_->[2]] ] } 
+	      sort { $a->[0] <=> $b->[0] } @$feats);
+    my $chg = 1;
+    my $iter = 0;
+    while( $chg ) {
+	$chg = 0;
+	for( my $i = 0; $i < scalar @f -1; $i++ ) {
+	    next unless defined $f[$i];
+	    for( my $j = $i+1; $j < scalar @f; $j++ ) {
+		next unless defined $f[$j];
+		my $cmp = &range_compare($f[$i],$f[$j]);
+		if( $cmp == 0 ) {
+		    &merge($f[$i],$f[$j]);
+		    $f[$j] = undef;
+		    $chg = 1;
+		} elsif( $cmp > 0 ) {
+		    last;
+		}
 	    }
-	    $run = 0;
-	    $index++;
-	} 
-	$last = $f;
-    }
-    if( $run ) { 
-	push @{$tmplst[-1]}, $last;
-    } else {
-	push @tmplst, [$last];
-    }
-    for my $grp ( @tmplst ) {
-	if( scalar @$grp == 1 ) {
-	    my ($row) = @$grp;
-	    shift @$row;
-	    push @newlst, [@$row];
-	} else {
-	    # these indexes are all +1 because we added the 
-	    # bin number in the initial for loop up there
-	    
-	    my $min = max(map { $_->[1] } @$grp);
-	    my $max = max(map { $_->[2] } @$grp);
-	    my $score = &mean(map { $_->[3] } @$grp);
-	    push @newlst, [$min,$max,$score];
 	}
+	@f = grep { defined $_ } @f;
     }
-    warn("newlist is ", scalar @newlst, " features long\n") if $debug;
-    return @newlst;
+
+    for my $f ( @f ) {
+	$f->[2] = mean(@{$f->[2]});
+    }
+    @f;
 }
 
 sub mean {
