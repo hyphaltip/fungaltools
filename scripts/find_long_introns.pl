@@ -27,7 +27,7 @@ my $prefix;
 my $debug = 0;
 my $src = 'gene:NC10_CALLGENES_FINAL_5';
 my $output;
-
+my $min_intron_size_reported = 300;
 GetOptions(
            'v|verbose!'  => \$debug,
            'u|user:s'    => \$user,
@@ -37,6 +37,7 @@ GetOptions(
 
            's|src:s'     => \$src,
            'o|output:s'  => \$output,
+	   'm|min:i'     => \$min_intron_size_reported,
            );
 
 unless(  defined $dbname ) {
@@ -87,6 +88,7 @@ while( my $gene = $iter->next_seq ) {
 		push @introns, [$gene->seq_id,
                                 $start,$end,
                                 $exon->strand,
+				abs($end-$start),
                                 sprintf('ID=%s.i%d;Gene=%s',
                                         $mRNA_name,
                                         $i++,
@@ -100,11 +102,10 @@ while( my $gene = $iter->next_seq ) {
 }
 warn("gene count $gene_count\n");
 
-for my $intron ( map { $_->[0] }
-		 sort { $b->[1] <=> $a->[1] }
-		 map { [$_,$_->[2] - $_->[1] ] }
+for my $intron ( sort { $b->[4] <=> $a->[4] }
 		 @introns
 	       ) {
+  last if $intron->[4] < $min_intron_size_reported;
   print join("\t", @$intron),"\n";
 }
 
