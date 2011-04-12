@@ -1,4 +1,5 @@
 #!/usr/bin/perl -w
+# Author: Jason Stajich jason.stajich@ucr.edu
 use strict;
 
 # based on this file,converted to tab delimited
