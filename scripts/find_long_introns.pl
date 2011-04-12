@@ -61,10 +61,12 @@ if( $output && $output ne '-' ) {
 my $iter = $dbh->get_seq_stream(-type => $src);
 my $count = 0;
 my $gene_count = 0;
+my @introns;
 while( my $gene = $iter->next_seq ) {
     $gene_count++;
     my $gene_name = $gene->name;
-    my @mRNA = $gene->get_SeqFeatures('mRNA');
+    my $sourcetag = $gene->source;
+    my @mRNA = $gene->get_SeqFeatures("mRNA:$sourcetag");
     if( ! @mRNA ) {
         warn("no mRNA for $gene_name\n");
     }
@@ -74,7 +76,7 @@ while( my $gene = $iter->next_seq ) {
         my $mRNA_name = $mRNA->name || 'mRNA-'.$mRNA->load_id;
         for my $exon ( sort { $a->start * $a->strand <=> 
                                   $b->start * $b->strand } 
-                       $mRNA->get_SeqFeatures('exon') ) {
+                       $mRNA->get_SeqFeatures("exon:$sourcetag") ) {
             if( $last_exon ) {
                 my ($start,$end) = ( $last_exon->end+1,
                                      $exon->start - 1);
@@ -82,26 +84,30 @@ while( my $gene = $iter->next_seq ) {
                     ($start,$end) = ( $last_exon->start-1,
                                       $exon->end + 1);
                 }
-                print $ofh join("\t",
-                                $gene->seq_id,
-                                $gene->source,
-                                'intron',
-                                $start,$end, '.',
-                                $exon->strand > 1 ? '+' : '-',
-                                '.',
+		push @introns, [$gene->seq_id,
+                                $start,$end,
+                                $exon->strand,
                                 sprintf('ID=%s.i%d;Gene=%s',
                                         $mRNA_name,
                                         $i++,
-                                        $gene_name)),"\n";          
-            }
+                                        $gene_name)];
+	      }
             $last_exon = $exon;
         }
         last;
     }
     last if $debug && $count++ > 10;
 }
-
 warn("gene count $gene_count\n");
+
+for my $intron ( map { $_->[0] }
+		 sort { $b->[1] <=> $a->[1] }
+		 map { [$_,$_->[2] - $_->[1] ] }
+		 @introns
+	       ) {
+  print join("\t", @$intron),"\n";
+}
+
 sub read_cnf {
     my ($user,$pass) = @_;
     if( -f "$HOME/.my.cnf") {
