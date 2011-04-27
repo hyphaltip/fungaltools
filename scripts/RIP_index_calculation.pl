@@ -39,7 +39,7 @@ Running options:	   'r|report:s'    => \$rformat,
  -t or --type    RIP index type   ('product','substrate','composite' or CRI)
  -w or --window  Window Size       integer value, default is 500 bp
  -s or --step    Window step size  integer value < windowsize, default 100
- -m or --minlen  min RIP feat len  Minmum length of a RIP region to be reported, 
+ -m or --minlen  min RIP feat len  Minimum length of a RIP region to be reported, 
                                    can't be less than 'step' long
                                    
 Input/Output
