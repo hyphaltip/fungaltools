@@ -7,8 +7,9 @@ use Text::CSV;
 my $dbfile = 'phenoImages.db';
 my $create = ! ( -f $dbfile && ! -z $dbfile );
 my $debug = 0;
+my $loci_per_page = 50;
 my $infile;
-my $interval = 25_000;
+my $interval =100_000;
 GetOptions(
 	   'c|create!' => \$create,
 	   'v|verbose!'=> \$debug,
@@ -40,12 +41,14 @@ if( $create ) {
 )');	
 
     $dbh->do('CREATE TABLE IF NOT EXISTS image (					      
-	image_id	INTEGER PRIMARY KEY, -- previously defined filenaem we downloaded
+	image_id	INTEGER PRIMARY KEY, -- previously defined filename we downloaded
 	locus_id INTEGER NOT NULL,
 	extension varchar(6) NOT NULL, -- jpg or png
         fname           varchar(24) NOT NULL,
 	title		varchar(48) NOT NULL,
+        condition           varchar(24) NOT NULL,
 	username  varchar(24),
+        status          varchar(32) NOT NULL,
 	dateCreated	date,
         FOREIGN KEY(locus_id) REFERENCES locus(locus_id)
 				       				      
@@ -63,8 +66,6 @@ if( $create ) {
         locus_id INTEGER NOT NULL,
 	ontology_term_id   INTEGER NOT NULL,
         obs_type varchar(24) NOT NULL,
-        condition           varchar(24) NOT NULL,
-        status          varchar(32) NOT NULL,	
         FOREIGN KEY(locus_id) REFERENCES locus(locus_id)
 --        FOREIGN KEY(ontology_term_id) REFERENCES locus(ontology_term_id)
 )');
@@ -74,9 +75,9 @@ if( $create ) {
     
     my $locus_id_sth = $dbh->prepare('SELECT locus_id FROM locus where locus = ?');
 
-    my $image_ins_sth = $dbh->prepare('INSERT INTO image (image_id, locus_id, extension, fname, title,username,dateCreated) VALUES (?,?,?,?,?,?,?)');
+    my $image_ins_sth = $dbh->prepare('INSERT INTO image (image_id, locus_id, extension, fname, title,condition,username,status,dateCreated) VALUES (?,?,?,?,?,?,?,?,?)');
 
-    my $phenotype_ins_sth = $dbh->prepare('INSERT INTO phenotype (locus_id, obs_type, condition, ontology_term_id, status) VALUES (?,?,?,?,?)');
+    my $phenotype_ins_sth = $dbh->prepare('INSERT INTO phenotype (locus_id, obs_type, ontology_term_id) VALUES (?,?,?)');
 
     my $ont_ins_sth = $dbh->prepare('INSERT INTO ontology_term (classification,value) VALUES (?,?)');
 
@@ -118,7 +119,9 @@ if( $create ) {
 				    $ext,
 				    $fname,
 				    $row->{'Image Title'},
+				    $row->{'Conditions'},
 				    $row->{'User'},
+				    $row->{'Status'},
 				    $row->{'Date'} );
 	}
 	
@@ -139,9 +142,7 @@ if( $create ) {
 	    }
 	    $phenotype_ins_sth->execute($locus_id,
 					$row->{'Observation Type'},
-					$row->{'Conditions'},
-					$ont_term_id,
-					$row->{'Status'});
+					$ont_term_id);
 	}
 	$dbh->commit if( $i > 0 && $i % $interval == 0);
 	last if $debug && $i > 1000;
@@ -154,17 +155,104 @@ if( $create ) {
     warn( "INSERTED ", $counter_row->[0], " loci\n");
 }
  
-my $query = $dbh->prepare("SELECT locus.locus, image.image_id, image.extension, image.title  FROM locus, image WHERE image.locus_id = locus.locus_id");
-my ($locus,$image_id,$ext,$title);
-$query->execute;
-$query->bind_columns(\$locus,\$image_id,\$ext,\$title);
-while( $query->fetch ) {
-    my $imgfile = sprintf("%s/%d.%s",$ext,$image_id,$ext);
-    #print join("\t", $locus, $imgfile, $title, $media), "\n";
-    if( ! -f $imgfile ) {
-	warn("missing $imgfile\n");
+my (%headers,%loci_group);
+
+{
+    my $query = $dbh->prepare("SELECT locus.locus, image.image_id, image.extension, image.fname, image.title, image.condition FROM locus, image WHERE image.locus_id = locus.locus_id and status = 'public' order by locus.locus, image.title");
+    my ($locus,$image_id,$ext,$fname,$title,$condition);
+    $query->execute;
+    $query->bind_columns(\$locus,\$image_id,\$ext,\$fname,\$title,\$condition);
+    my $success = 0;
+    my $tdir = "all_images";
+    mkdir($tdir);
+    while( $query->fetch ) {
+	my $imgfile = sprintf("%s/%d.%s",$ext,$image_id,$ext);
+	if( ! defined $condition ) {
+	    warn("no condition for $fname, $locus\n");
+	}
+	#print join("\t", $locus, $imgfile, $title, $media), "\n";
+	if( ! -f $imgfile ) {
+	    print ("missing $imgfile\n");
+	} else {
+	    if( ! -f "$tdir/$image_id.$ext" ||
+		! -l "$tdir/$image_id.$ext" ) {
+		symlink("../$imgfile","$tdir/$image_id.$ext");
+	    }
+	    if( ! -f "$tdir/$image_id.thumb.$ext") { 
+		system("convert -thumbnail 200 $tdir/$image_id.$ext $tdir/$image_id.thumb.$ext &");
+	    }
+	    $loci_group{$locus}->{join("=",$title,$condition)} = [ "$tdir/$fname","$tdir/$image_id.thumb.$ext"];
+#	printf $html "<tr><td>%s</td><td>%s</td><td>%s</td><td><a href=\"%s/%s\"><img width=150 src=\"%s/%s.thumb.%s\"></a></td></tr>\n",
+#	$locus, $title, ($condition || "NONE"), $tdir,$fname,$tdir,$image_id,$ext;
+	    $headers{$title}->{$condition}++;
+	    $success++;
+	}
+    }
+    warn "found $success files\n";
+}
+
+my @col_order;
+for my $title ( reverse sort keys %headers ) {
+    for my $condition ( sort keys %{$headers{$title}} ) {
+	push @col_order, join("=",$title,$condition);
     }
 }
+
+my @loci = sort keys %loci_group;
+my @splits;
+my @current;
+while( @loci ) {
+    if( scalar @current == $loci_per_page ) {
+	push @splits, [@current];
+	@current = ();
+    }
+    push @current, shift @loci;    
+}
+# fencepost
+if( @current == 1 ) { 
+    push @{$splits[-1]}, shift @current;
+} else {
+    push @splits, [@current];
+}
+open(my $over_html => ">index.html") || die $!;
+print $over_html "<HTML><HEAD><TITLE>Neurospora Phenotype DB images</TITLE></HEAD><BODY BGCOLOR=\"WHITE\"><h1><i>Neurospora crassa</i> Phenotype DB images</h1>\n";
+
+print $over_html "<ol>Pages\n";
+my $n = 1;
+for my $split ( @splits ) {
+    printf $over_html "<li> <a href=\"images_%d.html\">%s - %s</a> </li>\n",$n,$split->[0], $split->[-1];
+    $n++;
+}
+print $over_html "</ol>\n";
+
+print $over_html "</BODY><FOOT><FOOT></HTML>\n";
+
+$n = 1;
+for my $s ( @splits ) {
+    open(my $html => ">images_$n.html") || die $!;
+    printf $html "<HTML><HEAD><TITLE>Page %d: %s - %s</TITLE></HEAD><BODY BGCOLOR=\"WHITE\"><TABLE>\n",
+    $n, $s->[0], $s->[-1];
+    $n++;
+    print $html "<Tr><th>LOCUS</th>";
+    for my $col ( @col_order ) {
+	my ($title,$condition) = split('=',$col);
+	print $html "<th>", $title, "<br>",$condition, "</th>\n";
+    }
+    for my $locus ( @$s ) {
+	print $html "<Tr><td>$locus</td>";
+	for my $col ( @col_order ) {	
+	    if( exists $loci_group{$locus}->{$col} ) {
+		printf $html "<td><a href=\"%s\"><img src=\"%s\"></a></td>",@{ $loci_group{$locus}->{$col} };
+	    } else {
+		print $html "<td>No Image</td>";
+	    }
+	}
+	print $html "</Tr>\n";
+    }    
+    print $html "</TABLE><\/BODY><FOOT><\/FOOT></HTML>\n";
+    close($html);
+}
+
 
 END {
 
