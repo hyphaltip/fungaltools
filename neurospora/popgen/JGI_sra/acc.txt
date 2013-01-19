@@ -1,0 +1,20 @@
+SRA_STUDYID	symbol	mutant	FGSCSTRAIN
+SRP002701	per-1	perithecial-1	7035
+SRP002747	Sk-2	Sporekiller-2	3114
+SRP002748	mb-2	male barren-2	3564
+SRP002749	mb-1	male barren-1	3562
+SRP002750	fs-n	female sterile-n	3246
+SRP002757	fi	fissure	1303
+SRP002761	dot	dot	1211
+SRP002767	ts	tan spore	821
+SRP002768	tng	tangerine	3921
+SRP002769	sc	scumbo	49
+SRP003536	fld	fluffyoid	7022
+SRP003564	ty-1	tyrosinaseless-1	322
+SRP004280	mb-3	male barren-3	3566
+SRP004304	ti	tiny	309
+SRP004305	smco-1	semicolonial-1	1363
+SRP004307	do	doily	2261
+SRP004308	amyc	amycelial	305
+SRP004312	com	compact	106
+SRP004330	ff-1	female fertile-1	3831
