@@ -180,10 +180,9 @@ my $sth = $dbh->prepare("SELECT query_id, subject_id, evalue_mant, evalue_exp, p
 
 for my $sp ( keys %gene ) {
   open(my $ofh => ">$sp.aln_stats.csv") || die $!;
-  print $ofh join("\t", qw(GROUP_NUM QUERY SUBJECT EVALUE PERCENT_ID PERCENT_MATCH BRH
-			   R_SUBJECT R_EVALUE R_PERCENT_ID R_PERCENT_MATCH)), "\n";
+  print $ofh join("\t", qw(QUERY SUBJECT EVALUE PERCENT_ID PERCENT_MATCH BRH
+			   R_SUBJECT R_QUERY R_EVALUE R_PERCENT_ID R_PERCENT_MATCH)), "\n";
 
-  my $n = 0;
   for my $gn ( keys %{$gene{$sp}} ) {
     my $hits = $gene{$sp}->{$gn}->{hits};
     my @seensubjtax;
@@ -198,7 +197,7 @@ for my $sp ( keys %gene ) {
 	    ($f_qid, $f_subjid, $f_mant, $f_exp, $f_pid, $f_pmatch) = @{$row};
 	  } else {
 	    warn("skipping worse hit for\n\t",join("\t",@$row), " as compared to \n\t",
-		 join("\t",($f_qid, $f_subjid, $f_mant, $f_exp, $f_pid, $f_pmatch)),"\n");
+		 join("\t",($f_qid, $f_subjid, $f_mant, $f_exp, $f_pid, $f_pmatch)),"\n") if $debug;
 	  }
 	} else {
 	  ($f_qid, $f_subjid, $f_mant, $f_exp, $f_pid, $f_pmatch) = @{$row};
@@ -214,15 +213,20 @@ for my $sp ( keys %gene ) {
 	    ($r_qid, $r_subjid, $r_mant, $r_exp, $r_pid, $r_pmatch) = @{$row};
 	  } else {
 	    warn("skipping worse hit for\n\t",join("\t",@$row), " as compared to \n\t",
-		 join("\t",($r_qid, $r_subjid, $r_mant, $r_exp, $r_pid, $r_pmatch)),"\n");
+		 join("\t",($r_qid, $r_subjid, $r_mant, $r_exp, $r_pid, $r_pmatch)),"\n") if $debug;
 	  }
 	} else {
 	  ($r_qid, $r_subjid, $r_mant, $r_exp, $r_pid, $r_pmatch) = @{$row};
 	}
       }
       $sth->finish;
+      if ( ! $r_qid ) {
+	# skip this one the unidirectional search is hitting a false positive it seems
+	next;
+      }
+
       my $brh = $f_qid eq $r_subjid ? 'YES' : 'NO';
-      print $ofh join("\t", $n, $f_qid, $f_subjid, sprintf("%se%d",$f_mant,$f_exp),
+      print $ofh join("\t", $f_qid, $f_subjid, sprintf("%se%d",$f_mant,$f_exp),
 		      $f_pid, $f_pmatch,
 		      $brh,
 		      $r_qid, $r_subjid, sprintf("%se%d",$r_mant,$r_exp),
@@ -235,7 +239,7 @@ for my $sp ( keys %gene ) {
     }
     my $pat = join(",", sort @seensubjtax);
     $gene{$sp}->{$gn}->{pats} = $pat;
-    $patterns{$sp}->{$pat}++;
+    push @{$patterns{$sp}->{$pat}}, $gn;
   }
 }
 
