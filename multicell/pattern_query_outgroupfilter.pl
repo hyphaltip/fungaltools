@@ -48,7 +48,7 @@ my $dbh = DBI->connect("dbi:SQLite:dbname=$db","","",
 
 if ( $force || ! $exists ) {
   unlink($db);
-  $dbh = DBI->connect("dbi:SQLite:dbname=$db","","", 
+  $dbh = DBI->connect("dbi:SQLite:dbname=$db","","",
 		      {AutoCommit => $auto, RaiseError => 1});
   #  $dbh->do("PRAGMA foreign_keys=ON");
   $dbh->do(&create_tables());
