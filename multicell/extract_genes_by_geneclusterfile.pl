@@ -24,7 +24,6 @@ if ( ! $dir ) {
 }
 mkdir($dir) unless -d $dir;
 
-
 open(my $in => $input) || die $!;
 
 while (<$in>) {
@@ -35,15 +34,22 @@ while (<$in>) {
     mkdir("$dir/$pattern");
   }
   my ($sp,$genename) = split(/\|/,$gene);
+
+  if ( ! defined (my $target = $dbh->get_Seq_by_id($gene)) ) {
+    warn("cannot find $gene\n");
+  } else {
+    Bio::SeqIO->new(-format => 'fasta',
+		    -file   => ">$dir/$pattern/$genename.target.fas")->write_seq($target);
+  }
+
   my $out = Bio::SeqIO->new(-format => 'fasta',
-			    -file   => ">$dir/$pattern/$genename.genes.fa");
+			    -file   => ">$dir/$pattern/$genename.genes.fas");
   if ( ! exists $nms{$gene} ) {
     warn("did not have self ($gene) in the list for the gene?\n");
     warn("\t",join("\n\t",keys %nms),"\n");
     $nms{$gene} = 0;
-  } 
+  }
   for my $genename ( keys %nms ) {
-    next if $genename eq $gene;
     my $seq = $dbh->get_Seq_by_id($genename);
     if ( ! defined $seq) {
       warn("cannot find $genename\n");
