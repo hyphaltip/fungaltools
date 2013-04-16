@@ -1,14 +1,15 @@
 #!/usr/bin/perl -w
 use strict;
 use File::Spec;
+use Bio::DB::Fasta;
 
-# map from Mercator scaffolds to the velvet AGP scaffold
-
+my $min_size = 100;
 # currently we assume all velvet AGP files are all + stranded
 
 my $topdir = '/shared/stajichlab/projects/neurospora_homothallic/assemblies';
-my $velvet = File::Spec->catfile($topdir,'velvet');
+my $velvet = File::Spec->catfile($topdir,'velvet/RunOn');
 my $mercator = File::Spec->catfile($topdir,'mercator');
+
 
 my %species;
 
@@ -69,9 +70,17 @@ for my $file ( readdir(M) ) {
 	} else {
 	    die("unmatched scaffold name $scaffold\n");
 	}
-	push @info, [$st, $sn, 
-		     $scaffold_name, $scaf_start,$scaf_end, $order, $type,
-		     @rest];
+	my $len = abs($scaf_end - $scaf_start);
+	if( $len < $min_size ) {
+	    push @info, [$st, $sn, 
+			 $scaffold_name, $scaf_start,$scaf_end, $order, 
+			 'N', $len, 'scaffold', 'yes'];
+	    
+	} else {
+	    push @info, [$st, $sn, 
+			 $scaffold_name, $scaf_start,$scaf_end, $order, $type,
+			 @rest];
+	}
     }
     open(my $outname => ">$stem.scaffold_name_lookup.dat") || die $!;
     for my $nm ( 
@@ -88,6 +97,7 @@ for my $file ( readdir(M) ) {
 	my ($st,$sn,
 	    $scaffold_name, $scaf_start,$scaf_end, $order, $type,
 	    @rest) = @$d;
+
 	if( $type eq 'N' ) {
 	    print $ofh join("\t", 
 			    $scaffold_name,
