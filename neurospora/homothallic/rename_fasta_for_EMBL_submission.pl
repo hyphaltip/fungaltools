@@ -5,7 +5,7 @@ use Bio::SeqIO;
 my $dir = 'mercator';
 opendir(D,$dir) || die $!;
 for my $f ( readdir(D) ) {
-    if( $f =~ /(\S+)\.fa/) {
+    if( $f =~ /(\S+)\.fa$/) {
 	my $stem = $1;
 	my $in = Bio::SeqIO->new(-format => 'fasta',
 				 -file   => "$dir/$f");
