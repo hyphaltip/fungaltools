@@ -17,6 +17,7 @@ my $debug = 0;
 my $cutoff_id = 20;
 my $cutoff_pmatch = 30;
 my $evalue_outgroup_ratio = 0.20;
+my $evalue_cutoff = -10;
 my $generate_stats;
 my $outgroup_filter = 'Hsap';
 
@@ -32,6 +33,7 @@ GetOptions(
 	   'identity:s' => \$cutoff_id,
 	   'pmatch:s'   => \$cutoff_pmatch,
 	   'showstats!' => \$generate_stats,
+	   'e|evalue:s' => \$evalue_cutoff,
 	   'ignore=s' => \@ignore,
 );
 
@@ -148,8 +150,9 @@ for my $sp ( keys %species ) {
       while ( my ($taxid,$tax_evalue) = each %snames ) {
 	next if( $outgroup_filter eq $taxid || $tax_evalue->[0] == 0 ||
 		 $snames{$outgroup_filter}->[0] == 0);
-
-	if ( ($tax_evalue->[0] > $snames{$outgroup_filter}->[0]) &&
+        if( $tax_evalue->[0] > $evalue_cutoff ) {
+          push @to_remove, $taxid;
+        } elsif ( ($tax_evalue->[0] > $snames{$outgroup_filter}->[0]) &&
 	     abs($tax_evalue->[0] / $snames{$outgroup_filter}->[0])  < $evalue_outgroup_ratio ) {
 	  warn("removing ",join("-",@{$tax_evalue}),
 	       " for (outgroup is ",
