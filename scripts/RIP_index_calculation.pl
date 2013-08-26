@@ -27,7 +27,7 @@ RIP index types
      Sequences that have not been subject to RIP have values greater 
      than 1.1 while values less than 0.9 indicate RIP'd sequence.
 
-   o "Composite Index" (CRI) = [substrate - product] (Lewis et al
+   o "Composite Index" (CRI) = [product - substrate] (Lewis et al
       2009) "A positive CRI value implies that the DNA has been
       subjected to RIP" (Lewis et al).
 
