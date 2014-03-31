@@ -2,7 +2,6 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use Bio::Coordinate::GeneMapper;
 use Data::Dumper;
 
 my $gtf_file = 'neurospora_crassa_or74a_12_transcripts.gtf';
@@ -10,7 +9,7 @@ my $gff3_file = 'neurospora_crassa_or74a_12_transcripts.gff3';
 
 my $mRNA_broad_url = 'https://www.broadinstitute.org/annotation/genome/neurospora/download/?sp=EATranscriptsGtf&sp=SNC12&sp=S.zip';
 
-my $outfile = 'transcript_coords.gff3';
+my $outfile = 'exons_in_mRNA_coords.bed';
 
 GetOptions('g|gtf:s' => \$gtf_file,
 	   'gff3:s'  => \$gff3_file,
@@ -25,6 +24,8 @@ if ( ! -f $gtf_file ) {
 if ( ! -f $gff3_file ) {
   `perl gtf2gff3_3level.pl $gtf_file > $gff3_file`;
 }
+
+open(my $ofh => ">$outfile") || die "cannot open $outfile: $!";
 
 
 open(my $fh => $gff3_file ) || die "cannot open $gff3_file: $!";
@@ -80,14 +81,18 @@ while ( my ($transcriptid,$hash) = each %transcripts ) {
   }
   my $offset = $hash->{start};
   my $running = 1;
+  my %typect;
   foreach my $f ( sort { $a->{start} * $a->{strand} <=> $b->{start} * $b->{strand} } @all_features ) {
     my $start = $f->{start};
     my $end   = $f->{end};
     my $exonlen = $end - $start;
-    print join("\t", # $start,$end, 
-	       #(map { $f->{$_} } qw(strand type phase)),
+    print $ofh join("\t", # $start,$end, 
 	       $transcriptid,
-	       $running, ($running+$exonlen),$f->{type}),"\n";
+	       $running, ($running+$exonlen),sprintf("%s_%s_%d",
+						     $transcriptid,
+						     $f->{type},
+						     ++$typect{$f->{type}}),
+		   ),"\n";
     $running += $exonlen+1;
   }
 }
