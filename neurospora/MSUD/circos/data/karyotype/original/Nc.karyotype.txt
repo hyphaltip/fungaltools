@@ -1,0 +1,21 @@
+chr - Nc_Supercontig_12.1 LG1 0 9798893 chr1
+chr - Nc_Supercontig_12.2 LG2 0 4478683 chr2
+chr - Nc_Supercontig_12.3 LG3 0 5274802 chr3
+chr - Nc_Supercontig_12.4 LG4 0 6000761 chr4
+chr - Nc_Supercontig_12.5 LG5 0 6436246 chr5
+chr - Nc_Supercontig_12.6 LG6 0 4218384 chr6
+chr - Nc_Supercontig_12.7 LG7 0 4255303 chr7
+chr - Nc_Supercontig_12.8 scf8 0 192308 chr8
+chr - Nc_Supercontig_12.9 scf9 0 142473 chr9
+chr - Nc_Supercontig_12.10 scf10 0 125404 chr10
+chr - Nc_Supercontig_12.11 scf11 0 31696 chr11
+chr - Nc_Supercontig_12.12 scf12 0 19714 chr12
+chr - Nc_Supercontig_12.13 scf13 0 13515 chr13
+chr - Nc_Supercontig_12.14 scf14 0 11565 chr14
+chr - Nc_Supercontig_12.15 scf15 0 9397 chr15
+chr - Nc_Supercontig_12.16 scf16 0 8983 chr16
+chr - Nc_Supercontig_12.17 scf17 0 6701 chr17
+chr - Nc_Supercontig_12.18 scf18 0 6309 chr18
+chr - Nc_Supercontig_12.19 scf19 0 4755 chr19
+chr - Nc_Supercontig_12.20 scf20 0 1646 chr20
+
