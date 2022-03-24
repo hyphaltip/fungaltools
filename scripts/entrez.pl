@@ -1,10 +1,9 @@
 use LWP::Simple;
 use strict;
-my $gi_list = '24475906,224465210,50978625,9507198';
 
 #assemble the URL
 my $base = 'http://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
-my $query='txid4751[Organism:exp]';
+my $query='txid510951[Organism:exp]';
 my $db = 'genome';
 my $url = $base . "esearch.fcgi?db=$db&term=$query&rettype=acc&usehistory=y";
 

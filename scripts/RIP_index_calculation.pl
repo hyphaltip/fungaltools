@@ -119,7 +119,7 @@ my ($window,$step) = (500,10);
 my $minlen         = $step;
 my $sformat = 'fasta';  # sequence format
 my $rformat = 'RIPgff'; # RIP report format
-my %cutoffs = (composite => sub { (shift @_) >1 },
+my %cutoffs = (composite => sub { (shift @_) >0 },
 	       product   => sub { (shift @_) > 1.1},
 	       substrate => sub { (shift @_) < 0.9 } );
 #GFF fields
